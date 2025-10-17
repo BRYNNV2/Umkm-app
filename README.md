@@ -57,7 +57,8 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 📸 Tampilan Aplikasi
 
-💡 Tambahkan screenshot atau gif preview setelah kamu hosting di Vercel
+<img width="1900" height="906" alt="image" src="https://github.com/user-attachments/assets/c76e9e96-94ec-400e-bfec-f7e77994e07e" />
+
 
 💬 Kontribusi
 
