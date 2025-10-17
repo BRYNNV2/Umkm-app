@@ -21,14 +21,11 @@ Pelanggan dapat melihat daftar menu lengkap dengan tampilan gambar yang responsi
 
 🌈 Desain modern & responsif menggunakan Tailwind CSS
 
-☁️ Hosted di Vercel (gratis dan mudah di-deploy)
-
 🧠 Tech Stack
 Layer	Teknologi
 Frontend	React + TypeScript + Vite
 Styling	Tailwind CSS
 Backend	Supabase (Database + Auth + Storage)
-Hosting	Vercel
 Database	PostgreSQL (Supabase built-in)
 🧩 Cara Menjalankan di Lokal
 # Clone repo
@@ -67,6 +64,6 @@ Silakan fork repo ini, buat branch baru, lalu kirim PR jika ingin menambahkan fi
 
 🧑‍💻 Dibuat oleh
 
-Muhammad Febry Sedaghejaoh
+Mhd Febri Yansah dari jurusan Teknik Informatika Universitas Maritim Raja Ali Haji
 
 “Membangun solusi digital sederhana untuk membantu UMKM berkembang.”
