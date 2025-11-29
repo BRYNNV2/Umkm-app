@@ -43,11 +43,14 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: ('adm
   return <>{children}</>;
 };
 
+import ScrollToTop from './components/ScrollToTop';
+
 function App() {
   return (
     <AuthProvider>
       <CartProvider>
         <Router>
+          <ScrollToTop />
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/about" element={<AboutPage />} />
