@@ -21,22 +21,17 @@ const AdminSignupPage: React.FC = () => {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: role,
+          },
+        },
       });
 
       if (authError) throw authError;
 
       if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('admin_users')
-          .insert({
-            id: authData.user.id,
-            email,
-            full_name: fullName,
-            role,
-          });
-
-        if (profileError) throw profileError;
-
         alert('Admin berhasil dibuat! Silakan login.');
         navigate('/admin/login');
       }
