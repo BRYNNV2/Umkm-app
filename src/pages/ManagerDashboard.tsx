@@ -36,22 +36,12 @@ const ManagerDashboard: React.FC = () => {
         try {
             const { data, error } = await supabase
                 .from('recaps')
-                .select(`
-          *,
-          created_by_user:created_by (email)
-        `)
+                .select('*')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
 
-            // Transform data to include email flattened if possible, or just use as is
-            // Supabase join returns object structure, we can map it
-            const formattedRecaps = data?.map(recap => ({
-                ...recap,
-                created_by_email: recap.created_by_user?.email
-            })) || [];
-
-            setRecaps(formattedRecaps);
+            setRecaps(data || []);
         } catch (error) {
             console.error('Error fetching recaps:', error);
         } finally {
