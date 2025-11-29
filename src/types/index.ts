@@ -42,5 +42,6 @@ export interface AdminUser {
   id: string;
   email: string;
   full_name: string;
+  role: 'admin' | 'manager';
   created_at: string;
 }

@@ -44,6 +44,17 @@ interface DashboardStats {
   avgOrderValue: number;
 }
 
+interface Recap {
+  id: string;
+  period_start: string;
+  period_end: string;
+  total_revenue: number;
+  total_orders: number;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  notes: string;
+}
+
 const AdminDashboard: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -67,6 +78,7 @@ const AdminDashboard: React.FC = () => {
     completedOrders: 0,
     avgOrderValue: 0,
   });
+  const [recaps, setRecaps] = useState<Recap[]>([]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportDateRange, setExportDateRange] = useState({
     startDate: '',
@@ -86,6 +98,7 @@ const AdminDashboard: React.FC = () => {
     } else {
       fetchOrders();
       fetchMenuItems();
+      fetchRecaps();
     }
   }, [user, navigate]);
 
@@ -176,6 +189,20 @@ const AdminDashboard: React.FC = () => {
       setMenuItems(data || []);
     } catch (error) {
       console.error('Error fetching menu items:', error);
+    }
+  };
+
+  const fetchRecaps = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('recaps')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setRecaps(data || []);
+    } catch (error) {
+      console.error('Error fetching recaps:', error);
     }
   };
 
@@ -289,25 +316,70 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleExportToExcel = (period: 'all' | 'today' | 'week' | 'month' | 'custom') => {
+  const handleRequestRecap = async (period: 'all' | 'today' | 'week' | 'month' | 'custom') => {
     let filteredOrders = orders.filter((o) => o.status === 'completed');
     const now = new Date();
     const today = now.toISOString().split('T')[0];
+    let startDate = '';
+    let endDate = today;
 
     if (period === 'today') {
       filteredOrders = filteredOrders.filter((o) => o.created_at.startsWith(today));
+      startDate = today;
     } else if (period === 'week') {
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       filteredOrders = filteredOrders.filter((o) => new Date(o.created_at) >= weekAgo);
+      startDate = weekAgo.toISOString().split('T')[0];
     } else if (period === 'month') {
       const monthAgo = new Date(now.getFullYear(), now.getMonth(), 1);
       filteredOrders = filteredOrders.filter((o) => new Date(o.created_at) >= monthAgo);
+      startDate = monthAgo.toISOString().split('T')[0];
     } else if (period === 'custom' && exportDateRange.startDate && exportDateRange.endDate) {
       filteredOrders = filteredOrders.filter(
         (o) =>
           o.created_at >= exportDateRange.startDate && o.created_at <= exportDateRange.endDate + 'T23:59:59'
       );
+      startDate = exportDateRange.startDate;
+      endDate = exportDateRange.endDate;
+    } else {
+      // All time
+      startDate = '2020-01-01';
     }
+
+    const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.total_amount, 0);
+    const totalOrders = filteredOrders.length;
+
+    try {
+      const { error } = await supabase.from('recaps').insert({
+        period_start: startDate,
+        period_end: endDate,
+        total_revenue: totalRevenue,
+        total_orders: totalOrders,
+        status: 'pending',
+        created_by: user?.id,
+        notes: `Rekap ${period}`
+      });
+
+      if (error) throw error;
+
+      alert('Permintaan rekap berhasil dikirim ke Manager!');
+      setShowExportModal(false);
+      fetchRecaps();
+    } catch (error) {
+      console.error('Error requesting recap:', error);
+      alert('Gagal mengirim permintaan rekap');
+    }
+  };
+
+  const handleDownloadRecap = (recap: Recap) => {
+    let filteredOrders = orders.filter((o) => o.status === 'completed');
+
+    // Filter by date range of the recap
+    filteredOrders = filteredOrders.filter(
+      (o) =>
+        o.created_at.split('T')[0] >= recap.period_start &&
+        o.created_at.split('T')[0] <= recap.period_end
+    );
 
     const excelData = filteredOrders.map((order) => ({
       Tanggal: new Date(order.created_at).toLocaleDateString('id-ID', {
@@ -362,24 +434,9 @@ const AdminDashboard: React.FC = () => {
       { wch: 30 },
     ];
 
-    const periodLabel =
-      period === 'today'
-        ? 'Harian'
-        : period === 'week'
-        ? 'Mingguan'
-        : period === 'month'
-        ? 'Bulanan'
-        : period === 'custom'
-        ? 'Custom'
-        : 'Semua';
-
-    const fileName = `Laporan_Penjualan_${periodLabel}_${
-      new Date().toISOString().split('T')[0]
-    }.xlsx`;
+    const fileName = `Laporan_Penjualan_${recap.period_start}_${recap.period_end}.xlsx`;
 
     XLSX.writeFile(workbook, fileName);
-    setShowExportModal(false);
-    alert('Laporan berhasil diexport!');
   };
 
   const formatPrice = (price: number) => {
@@ -431,11 +488,10 @@ const AdminDashboard: React.FC = () => {
         <div className="flex space-x-2 mb-6 overflow-x-auto">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-300 whitespace-nowrap ${
-              activeTab === 'dashboard'
-                ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-300 whitespace-nowrap ${activeTab === 'dashboard'
+              ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
           >
             <LayoutDashboard className="w-5 h-5" />
             <span>Dashboard</span>
@@ -443,11 +499,10 @@ const AdminDashboard: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('orders')}
-            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-300 whitespace-nowrap ${
-              activeTab === 'orders'
-                ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-300 whitespace-nowrap ${activeTab === 'orders'
+              ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
           >
             <ShoppingBag className="w-5 h-5" />
             <span>Pesanan</span>
@@ -455,11 +510,10 @@ const AdminDashboard: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('menu')}
-            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-300 whitespace-nowrap ${
-              activeTab === 'menu'
-                ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg'
-                : 'bg-white text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-300 whitespace-nowrap ${activeTab === 'menu'
+              ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg'
+              : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
           >
             <UtensilsCrossed className="w-5 h-5" />
             <span>Menu</span>
@@ -475,8 +529,62 @@ const AdminDashboard: React.FC = () => {
                 className="flex items-center space-x-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-all duration-300"
               >
                 <Download className="w-5 h-5" />
-                <span>Export Excel</span>
+                <span>Request Rekap</span>
               </button>
+            </div>
+
+            {/* Recaps List */}
+            <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Status Rekap Penjualan</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b-2 border-gray-200">
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Periode</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Total</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recaps.map((recap) => (
+                      <tr key={recap.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4 text-sm text-gray-600">
+                          {new Date(recap.period_start).toLocaleDateString('id-ID')} - {new Date(recap.period_end).toLocaleDateString('id-ID')}
+                        </td>
+                        <td className="py-3 px-4 font-bold text-gray-800">
+                          {formatPrice(recap.total_revenue)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${recap.status === 'approved' ? 'bg-green-100 text-green-700' :
+                            recap.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                            {recap.status === 'approved' ? 'Disetujui' :
+                              recap.status === 'rejected' ? 'Ditolak' : 'Menunggu'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          {recap.status === 'approved' && (
+                            <button
+                              onClick={() => handleDownloadRecap(recap)}
+                              className="text-green-600 hover:text-green-800 font-medium text-sm flex items-center space-x-1"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>Download</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {recaps.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="text-center py-4 text-gray-500">Belum ada request rekap</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -583,13 +691,12 @@ const AdminDashboard: React.FC = () => {
                       <div className="text-right">
                         <p className="font-bold text-red-600">{formatPrice(order.total_amount)}</p>
                         <span
-                          className={`text-xs px-2 py-1 rounded-full ${
-                            order.status === 'completed'
-                              ? 'bg-green-100 text-green-700'
-                              : order.status === 'pending'
+                          className={`text-xs px-2 py-1 rounded-full ${order.status === 'completed'
+                            ? 'bg-green-100 text-green-700'
+                            : order.status === 'pending'
                               ? 'bg-yellow-100 text-yellow-700'
                               : 'bg-red-100 text-red-700'
-                          }`}
+                            }`}
                         >
                           {order.status}
                         </span>
@@ -644,11 +751,10 @@ const AdminDashboard: React.FC = () => {
                       <td className="py-3 px-4 text-sm text-gray-600">{order.customer_phone}</td>
                       <td className="py-3 px-4">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            order.order_type === 'online'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-purple-100 text-purple-700'
-                          }`}
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${order.order_type === 'online'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-purple-100 text-purple-700'
+                            }`}
                         >
                           {order.order_type === 'online' ? 'Online' : 'Offline'}
                         </span>
@@ -660,13 +766,12 @@ const AdminDashboard: React.FC = () => {
                         <select
                           value={order.status}
                           onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
-                          className={`px-3 py-1 rounded-full text-xs font-medium border-2 cursor-pointer ${
-                            order.status === 'completed'
-                              ? 'bg-green-100 text-green-700 border-green-200'
-                              : order.status === 'cancelled'
+                          className={`px-3 py-1 rounded-full text-xs font-medium border-2 cursor-pointer ${order.status === 'completed'
+                            ? 'bg-green-100 text-green-700 border-green-200'
+                            : order.status === 'cancelled'
                               ? 'bg-red-100 text-red-700 border-red-200'
                               : 'bg-yellow-100 text-yellow-700 border-yellow-200'
-                          }`}
+                            }`}
                         >
                           <option value="pending">Pending</option>
                           <option value="completed">Selesai</option>
@@ -973,18 +1078,18 @@ const AdminDashboard: React.FC = () => {
 
               <div className="space-y-3">
                 <button
-                  onClick={() => handleExportToExcel('all')}
+                  onClick={() => handleRequestRecap('all')}
                   className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 p-4 rounded-xl text-left transition-all duration-300 flex items-center justify-between group"
                 >
                   <div>
                     <p className="font-bold">Semua Data</p>
-                    <p className="text-sm text-gray-500">Export semua pesanan completed</p>
+                    <p className="text-sm text-gray-500">Request rekap semua pesanan completed</p>
                   </div>
                   <Download className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
                 </button>
 
                 <button
-                  onClick={() => handleExportToExcel('today')}
+                  onClick={() => handleRequestRecap('today')}
                   className="w-full bg-blue-50 hover:bg-blue-100 text-blue-800 p-4 rounded-xl text-left transition-all duration-300 flex items-center justify-between group"
                 >
                   <div>
@@ -997,7 +1102,7 @@ const AdminDashboard: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => handleExportToExcel('week')}
+                  onClick={() => handleRequestRecap('week')}
                   className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-800 p-4 rounded-xl text-left transition-all duration-300 flex items-center justify-between group"
                 >
                   <div>
@@ -1010,7 +1115,7 @@ const AdminDashboard: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => handleExportToExcel('month')}
+                  onClick={() => handleRequestRecap('month')}
                   className="w-full bg-pink-50 hover:bg-pink-100 text-pink-800 p-4 rounded-xl text-left transition-all duration-300 flex items-center justify-between group"
                 >
                   <div>
@@ -1053,7 +1158,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleExportToExcel('custom')}
+                    onClick={() => handleRequestRecap('custom')}
                     disabled={!exportDateRange.startDate || !exportDateRange.endDate}
                     className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white p-3 rounded-xl font-bold transition-all duration-300 flex items-center justify-center space-x-2"
                   >

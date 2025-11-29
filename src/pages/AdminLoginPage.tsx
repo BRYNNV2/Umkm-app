@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Lock, Mail, Flame } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 const AdminLoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -21,7 +22,21 @@ const AdminLoginPage: React.FC = () => {
     if (error) {
       setError('Email atau password salah');
     } else {
-      navigate('/admin');
+      // Role check will be handled by AuthContext or we can check here if we want immediate redirect
+      // But AuthContext updates state asynchronously.
+      // Better to let the useEffect in the dashboard pages handle redirection or check here.
+      // Let's check here for better UX.
+      const { data: userData } = await supabase
+        .from('admin_users')
+        .select('role')
+        .eq('email', email)
+        .single();
+
+      if (userData?.role === 'manager') {
+        navigate('/manager');
+      } else {
+        navigate('/admin');
+      }
     }
 
     setLoading(false);

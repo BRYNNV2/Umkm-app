@@ -7,6 +7,7 @@ const AdminSignupPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [role, setRole] = useState<'admin' | 'manager'>('admin');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ const AdminSignupPage: React.FC = () => {
             id: authData.user.id,
             email,
             full_name: fullName,
+            role,
           });
 
         if (profileError) throw profileError;
@@ -114,6 +116,23 @@ const AdminSignupPage: React.FC = () => {
                 placeholder="Minimal 6 karakter"
                 minLength={6}
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center space-x-2">
+                  <User className="w-4 h-4" />
+                  <span>Role</span>
+                </div>
+              </label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as 'admin' | 'manager')}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-all duration-300"
+              >
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+              </select>
             </div>
           </div>
 
