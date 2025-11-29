@@ -10,8 +10,11 @@ import AdminSignupPage from './pages/AdminSignupPage';
 import AdminDashboard from './pages/AdminDashboard';
 import ManagerDashboard from './pages/ManagerDashboard';
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
+const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: ('admin' | 'manager')[] }> = ({
+  children,
+  allowedRoles
+}) => {
+  const { user, role, loading } = useAuth();
 
   if (loading) {
     return (
@@ -26,6 +29,15 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   if (!user) {
     return <Navigate to="/admin/login" replace />;
+  }
+
+  if (allowedRoles && role && !allowedRoles.includes(role)) {
+    // Redirect based on role if trying to access unauthorized page
+    if (role === 'manager') {
+      return <Navigate to="/manager" replace />;
+    } else {
+      return <Navigate to="/admin" replace />;
+    }
   }
 
   return <>{children}</>;
@@ -45,7 +57,7 @@ function App() {
             <Route
               path="/admin"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <AdminDashboard />
                 </ProtectedRoute>
               }
@@ -53,7 +65,7 @@ function App() {
             <Route
               path="/manager"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['manager']}>
                   <ManagerDashboard />
                 </ProtectedRoute>
               }

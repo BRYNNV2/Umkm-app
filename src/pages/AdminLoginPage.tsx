@@ -26,13 +26,20 @@ const AdminLoginPage: React.FC = () => {
       // But AuthContext updates state asynchronously.
       // Better to let the useEffect in the dashboard pages handle redirection or check here.
       // Let's check here for better UX.
-      const { data: userData } = await supabase
+      // Fetch role directly to ensure we have the latest data
+      const { data: userData, error: roleError } = await supabase
         .from('admin_users')
         .select('role')
         .eq('email', email)
         .single();
 
-      if (userData?.role === 'manager') {
+      if (roleError) {
+        console.error('Error fetching role:', roleError);
+        // If error fetching role, try to rely on what AuthContext will eventually get, 
+        // but for now default to admin or show error. 
+        // Let's assume admin for safety but log it.
+        navigate('/admin');
+      } else if (userData?.role === 'manager') {
         navigate('/manager');
       } else {
         navigate('/admin');
