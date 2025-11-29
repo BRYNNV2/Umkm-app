@@ -59,9 +59,8 @@ const LandingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white">
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled ? 'bg-white shadow-lg py-4' : 'bg-transparent py-6'
-        }`}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white shadow-lg py-4' : 'bg-transparent py-6'
+          }`}
       >
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between">
@@ -82,11 +81,10 @@ const LandingPage: React.FC = () => {
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => navigate('/about')}
-                className={`hidden sm:block ${
-                  scrolled
+                className={`${scrolled
                     ? 'text-gray-600 hover:text-red-500'
                     : 'text-white hover:text-orange-200'
-                } px-4 py-2 rounded-lg font-medium transition-all duration-300`}
+                  } px-4 py-2 rounded-lg font-medium transition-all duration-300`}
               >
                 Tentang Kami
               </button>
@@ -98,11 +96,10 @@ const LandingPage: React.FC = () => {
               </button>
               <button
                 onClick={() => navigate('/admin/login')}
-                className={`${
-                  scrolled
+                className={`${scrolled
                     ? 'text-gray-600 hover:text-red-500'
                     : 'text-white hover:text-orange-200'
-                } px-4 py-2 rounded-lg font-medium transition-all duration-300`}
+                  } px-4 py-2 rounded-lg font-medium transition-all duration-300`}
               >
                 Admin
               </button>
