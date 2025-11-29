@@ -50,10 +50,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .single();
 
       if (error) throw error;
-      setRole(data?.role || 'admin'); // Default to admin if not found (though should be found)
+
+      // If role is found, set it. If not, set to null (don't default to admin!)
+      setRole(data?.role as 'admin' | 'manager' | null);
+
     } catch (error) {
       console.error('Error fetching user role:', error);
-      setRole('admin'); // Fallback
+      setRole(null); // Safety: if error, no role access
     } finally {
       setLoading(false);
     }
