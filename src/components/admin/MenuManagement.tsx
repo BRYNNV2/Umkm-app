@@ -8,6 +8,8 @@ const MenuManagement: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -40,20 +42,58 @@ const MenuManagement: React.FC = () => {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const uploadImage = async (file: File) => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('menu-images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('menu-images')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUploading(true);
 
     try {
+      let imageUrl = formData.image_url;
+
+      if (selectedFile) {
+        imageUrl = await uploadImage(selectedFile);
+      }
+
+      const dataToSave = { ...formData, image_url: imageUrl };
+
       if (editingItem) {
         const { error } = await supabase
           .from('menu_items')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', editingItem.id);
 
         if (error) throw error;
         alert('Menu berhasil diupdate!');
       } else {
-        const { error } = await supabase.from('menu_items').insert(formData);
+        const { error } = await supabase.from('menu_items').insert(dataToSave);
 
         if (error) throw error;
         alert('Menu berhasil ditambahkan!');
@@ -65,7 +105,9 @@ const MenuManagement: React.FC = () => {
       fetchMenuItems();
     } catch (error) {
       console.error('Error saving menu item:', error);
-      alert('Terjadi kesalahan saat menyimpan menu');
+      alert('Terjadi kesalahan saat menyimpan menu. Pastikan Anda telah menjalankan SQL untuk storage bucket.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -95,6 +137,7 @@ const MenuManagement: React.FC = () => {
       is_available: item.is_available,
       spicy_level: item.spicy_level,
     });
+    setSelectedFile(null);
     setShowModal(true);
   };
 
@@ -108,6 +151,7 @@ const MenuManagement: React.FC = () => {
       is_available: true,
       spicy_level: 2,
     });
+    setSelectedFile(null);
   };
 
   const formatPrice = (price: number) => {
@@ -153,9 +197,12 @@ const MenuManagement: React.FC = () => {
           >
             <div className="relative h-48">
               <img
-                src={item.image_url}
+                src={item.image_url || 'https://via.placeholder.com/300?text=No+Image'}
                 alt={item.name}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300?text=Error+Loading+Image';
+                }}
               />
               {!item.is_available && (
                 <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
@@ -171,11 +218,10 @@ const MenuManagement: React.FC = () => {
                   <p className="text-xs text-gray-500">{categoryLabels[item.category]}</p>
                 </div>
                 <span
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    item.is_available
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${item.is_available
                       ? 'bg-green-100 text-green-700'
                       : 'bg-red-100 text-red-700'
-                  }`}
+                    }`}
                 >
                   {item.is_available ? 'Tersedia' : 'Habis'}
                 </span>
@@ -291,19 +337,46 @@ const MenuManagement: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <div className="flex items-center space-x-2">
-                      <ImageIcon className="w-4 h-4" />
-                      <span>URL Gambar</span>
-                    </div>
+                    Gambar Menu
                   </label>
-                  <input
-                    type="url"
-                    required
-                    value={formData.image_url}
-                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
-                    placeholder="https://example.com/image.jpg"
-                  />
+                  <div className="space-y-3">
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-green-500 transition-colors">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                        id="menu-image-upload"
+                      />
+                      <label htmlFor="menu-image-upload" className="cursor-pointer flex flex-col items-center justify-center">
+                        <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
+                        <span className="text-sm text-gray-600">
+                          {selectedFile ? selectedFile.name : 'Klik untuk upload gambar'}
+                        </span>
+                        <span className="text-xs text-gray-400 mt-1">PNG, JPG, JPEG (Max 2MB)</span>
+                      </label>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-200"></div>
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                        <span className="px-2 bg-white text-gray-500">Atau gunakan URL</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <ImageIcon className="w-4 h-4 text-gray-400" />
+                      <input
+                        type="url"
+                        value={formData.image_url}
+                        onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none text-sm"
+                        placeholder="https://example.com/image.jpg"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {formData.category === 'main' && (
@@ -340,9 +413,10 @@ const MenuManagement: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full mt-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-4 rounded-xl font-bold transition-all duration-300 hover:scale-105"
+                disabled={uploading}
+                className="w-full mt-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white py-4 rounded-xl font-bold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {editingItem ? 'Update Menu' : 'Tambah Menu'}
+                {uploading ? 'Mengupload...' : (editingItem ? 'Update Menu' : 'Tambah Menu')}
               </button>
             </form>
           </div>
