@@ -15,6 +15,7 @@ const Checkout: React.FC<CheckoutProps> = ({ isOpen, onClose }) => {
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [lastOrderTotal, setLastOrderTotal] = useState(0);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -58,6 +59,8 @@ const Checkout: React.FC<CheckoutProps> = ({ isOpen, onClose }) => {
 
       if (itemsError) throw itemsError;
 
+      const total = getTotalPrice();
+      setLastOrderTotal(total);
       setShowSuccess(true);
       clearCart();
 
@@ -90,7 +93,7 @@ const Checkout: React.FC<CheckoutProps> = ({ isOpen, onClose }) => {
             Terima kasih {customerName}! Pesanan Anda sedang diproses.
           </p>
           <p className="text-sm text-gray-500">
-            Total: <span className="font-bold text-red-600">{formatPrice(getTotalPrice())}</span>
+            Total: <span className="font-bold text-red-600">{formatPrice(lastOrderTotal)}</span>
           </p>
         </div>
       </div>
