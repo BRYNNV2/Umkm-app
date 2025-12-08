@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Flame, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { LogOut, Flame, FileText, CheckCircle, XCircle, Clock, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Order } from '../types';
+import ConfirmModal from '../components/ConfirmModal';
 
 interface Recap {
     id: string;
@@ -24,7 +25,15 @@ const ManagerDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [selectedRecap, setSelectedRecap] = useState<Recap | null>(null);
     const [recapOrders, setRecapOrders] = useState<Order[]>([]);
+
     const [loadingDetails, setLoadingDetails] = useState(false);
+    const [confirmModal, setConfirmModal] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: () => { },
+        variant: 'danger' as 'danger' | 'warning' | 'info'
+    });
 
     useEffect(() => {
         if (!user) {
@@ -81,29 +90,64 @@ const ManagerDashboard: React.FC = () => {
     };
 
     const handleUpdateStatus = async (recapId: string, newStatus: 'approved' | 'rejected') => {
-        if (!confirm(`Apakah Anda yakin ingin mengubah status menjadi ${newStatus}?`)) return;
+        setConfirmModal({
+            isOpen: true,
+            title: newStatus === 'approved' ? 'Setujui Rekap' : 'Tolak Rekap',
+            message: `Apakah Anda yakin ingin mengubah status menjadi ${newStatus}?`,
+            variant: newStatus === 'approved' ? 'info' : 'warning',
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('recaps')
+                        .update({
+                            status: newStatus,
+                            approved_by: user?.id
+                        })
+                        .eq('id', recapId);
 
-        try {
-            const { error } = await supabase
-                .from('recaps')
-                .update({
-                    status: newStatus,
-                    approved_by: user?.id
-                })
-                .eq('id', recapId);
+                    if (error) throw error;
 
-            if (error) throw error;
-
-            fetchRecaps();
-            if (selectedRecap?.id === recapId) {
-                setSelectedRecap(null); // Close modal if open
+                    fetchRecaps();
+                    if (selectedRecap?.id === recapId) {
+                        setSelectedRecap(null); // Close modal if open
+                    }
+                } catch (error) {
+                    console.error('Error updating status:', error);
+                    alert('Gagal mengupdate status');
+                }
             }
-            alert(`Rekap berhasil di-${newStatus === 'approved' ? 'setujui' : 'tolak'}!`);
-        } catch (error) {
-            console.error('Error updating status:', error);
-            alert('Terjadi kesalahan saat mengupdate status');
-        }
+        });
     };
+
+
+
+
+
+    const handleDeleteRecap = async (recapId: string) => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Hapus Rekap',
+            message: 'Yakin ingin menghapus rekap ini?',
+            variant: 'danger',
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase.from('recaps').delete().eq('id', recapId);
+
+                    if (error) throw error;
+                    fetchRecaps();
+                    if (selectedRecap?.id === recapId) {
+                        setSelectedRecap(null);
+                    }
+                    alert('Rekap berhasil dihapus!');
+                } catch (error) {
+                    console.error('Error deleting recap:', error);
+                    alert('Terjadi kesalahan saat menghapus rekap');
+                }
+            }
+        });
+    };
+
+
 
     const handleLogout = async () => {
         await signOut();
@@ -217,6 +261,12 @@ const ManagerDashboard: React.FC = () => {
                                             <span className="font-medium capitalize">{recap.status === 'approved' ? 'Disetujui' : 'Ditolak'}</span>
                                         </div>
                                     )}
+                                    <button
+                                        onClick={() => handleDeleteRecap(recap.id)}
+                                        className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 className="w-5 h-5" />
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -233,128 +283,122 @@ const ManagerDashboard: React.FC = () => {
 
             {/* Detail Modal */}
             {selectedRecap && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-white rounded-2xl w-full max-w-4xl my-8 shadow-2xl max-h-[90vh] flex flex-col">
-                        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white p-6 rounded-t-2xl flex-shrink-0">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h2 className="text-2xl font-bold">Detail Rekap Penjualan</h2>
-                                    <p className="text-blue-100 text-sm mt-1">
-                                        Periode: {formatDate(selectedRecap.period_start)} - {formatDate(selectedRecap.period_end)}
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => setSelectedRecap(null)}
-                                    className="hover:bg-white hover:bg-opacity-20 p-2 rounded-full transition-colors"
-                                >
-                                    <XCircle className="w-8 h-8" />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="p-6 overflow-y-auto flex-grow">
-                            {loadingDetails ? (
-                                <div className="text-center py-12">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 mx-auto mb-4" />
-                                    <p className="text-gray-600">Memuat data pesanan...</p>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                        <div className="bg-green-50 p-4 rounded-xl border border-green-100">
-                                            <p className="text-sm text-green-600 mb-1">Total Pendapatan</p>
-                                            <p className="text-2xl font-bold text-green-700">{formatPrice(selectedRecap.total_revenue)}</p>
-                                        </div>
-                                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                            <p className="text-sm text-blue-600 mb-1">Total Pesanan</p>
-                                            <p className="text-2xl font-bold text-blue-700">{selectedRecap.total_orders}</p>
-                                        </div>
-                                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                                            <p className="text-sm text-gray-600 mb-1">Status</p>
-                                            <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold capitalize ${selectedRecap.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                                selectedRecap.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                                    'bg-yellow-100 text-yellow-700'
-                                                }`}>
-                                                {selectedRecap.status === 'approved' ? 'Disetujui' :
-                                                    selectedRecap.status === 'rejected' ? 'Ditolak' : 'Menunggu'}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <h3 className="font-bold text-gray-800 mb-4 text-lg">Daftar Transaksi</h3>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left border-collapse">
-                                            <thead>
-                                                <tr className="bg-gray-50 border-b border-gray-200">
-                                                    <th className="p-3 font-semibold text-gray-600">Tanggal</th>
-                                                    <th className="p-3 font-semibold text-gray-600">Pelanggan</th>
-                                                    <th className="p-3 font-semibold text-gray-600">Tipe</th>
-                                                    <th className="p-3 font-semibold text-gray-600 text-right">Total</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {recapOrders.map((order) => (
-                                                    <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                                        <td className="p-3 text-sm text-gray-600">
-                                                            {new Date(order.created_at).toLocaleString('id-ID')}
-                                                        </td>
-                                                        <td className="p-3 font-medium text-gray-800">
-                                                            {order.customer_name}
-                                                            <div className="text-xs text-gray-500">{order.customer_phone}</div>
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <span className={`text-xs px-2 py-1 rounded-full ${order.order_type === 'online' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                                                                {order.order_type}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-3 font-bold text-gray-800 text-right">
-                                                            {formatPrice(order.total_amount)}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {recapOrders.length === 0 && (
-                                                    <tr>
-                                                        <td colSpan={4} className="text-center py-8 text-gray-500">
-                                                            Tidak ada data pesanan detail yang ditemukan.
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-
-                        <div className="p-6 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end space-x-3">
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+                            <h3 className="text-xl font-bold text-gray-800">Detail Rekap Penjualan</h3>
                             <button
                                 onClick={() => setSelectedRecap(null)}
-                                className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                             >
-                                Tutup
+                                <XCircle className="w-6 h-6 text-gray-500" />
                             </button>
-                            {selectedRecap.status === 'pending' && (
-                                <>
-                                    <button
-                                        onClick={() => handleUpdateStatus(selectedRecap.id, 'rejected')}
-                                        className="px-6 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium transition-colors"
-                                    >
-                                        Tolak
-                                    </button>
-                                    <button
-                                        onClick={() => handleUpdateStatus(selectedRecap.id, 'approved')}
-                                        className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium transition-colors shadow-lg shadow-green-200"
-                                    >
-                                        Setujui Rekap
-                                    </button>
-                                </>
+                        </div>
+
+                        <div className="p-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <div className="bg-gray-50 p-4 rounded-xl">
+                                    <h4 className="text-sm font-medium text-gray-500 mb-2">Periode</h4>
+                                    <p className="font-semibold text-gray-800">
+                                        {new Date(selectedRecap.period_start).toLocaleDateString('id-ID')} - {new Date(selectedRecap.period_end).toLocaleDateString('id-ID')}
+                                    </p>
+                                </div>
+                                <div className="bg-gray-50 p-4 rounded-xl">
+                                    <h4 className="text-sm font-medium text-gray-500 mb-2">Total Pendapatan</h4>
+                                    <p className="font-semibold text-gray-800">
+                                        {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(selectedRecap.total_revenue)}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <h4 className="text-lg font-bold text-gray-800 mb-4">Daftar Pesanan</h4>
+                            {loadingDetails ? (
+                                <div className="text-center py-8">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-red-500 mx-auto mb-2" />
+                                    <p className="text-gray-500 text-sm">Memuat data pesanan...</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="border-b border-gray-200">
+                                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Waktu</th>
+                                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Pelanggan</th>
+                                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Total</th>
+                                                <th className="text-left py-3 px-4 font-semibold text-gray-700">Metode</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {recapOrders.map((order) => (
+                                                <tr key={order.id} className="border-b border-gray-100">
+                                                    <td className="py-3 px-4 text-sm text-gray-600">
+                                                        {new Date(order.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                                    </td>
+                                                    <td className="py-3 px-4 text-sm font-medium text-gray-800">
+                                                        {order.customer_name}
+                                                    </td>
+                                                    <td className="py-3 px-4 text-sm font-bold text-gray-800">
+                                                        {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(order.total_amount)}
+                                                    </td>
+                                                    <td className="py-3 px-4 text-sm">
+                                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${order.payment_method === 'qris'
+                                                            ? 'bg-blue-100 text-blue-700'
+                                                            : order.payment_method === 'transfer'
+                                                                ? 'bg-purple-100 text-purple-700'
+                                                                : 'bg-green-100 text-green-700'
+                                                            }`}>
+                                                            {order.payment_method === 'qris' ? 'QRIS' :
+                                                                order.payment_method === 'transfer' ? 'Transfer' : 'Tunai'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {recapOrders.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={4} className="text-center py-4 text-gray-500">
+                                                        Tidak ada data pesanan untuk periode ini
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             )}
+
+                            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100">
+                                {selectedRecap.status === 'pending' && (
+                                    <>
+                                        <button
+                                            onClick={() => handleUpdateStatus(selectedRecap.id, 'rejected')}
+                                            className="px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 font-medium"
+                                        >
+                                            Tolak
+                                        </button>
+                                        <button
+                                            onClick={() => handleUpdateStatus(selectedRecap.id, 'approved')}
+                                            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium"
+                                        >
+                                            Setujui
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+                onConfirm={confirmModal.onConfirm}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                variant={confirmModal.variant}
+            />
         </div>
     );
 };
 
 export default ManagerDashboard;
+

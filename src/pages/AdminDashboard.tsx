@@ -21,10 +21,20 @@ import {
   Download,
   FileSpreadsheet,
 } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Order, OrderItem, MenuItem } from '../types';
 import MenuManagement from '../components/admin/MenuManagement';
+import ConfirmModal from '../components/ConfirmModal';
 
 interface OrderWithItems extends Order {
   order_items: (OrderItem & { menu_item?: MenuItem })[];
@@ -90,6 +100,15 @@ const AdminDashboard: React.FC = () => {
     customer_phone: '',
     notes: '',
     items: [] as { menu_item_id: string; quantity: number; spicy_level: number }[],
+  });
+
+
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => { },
+    variant: 'danger' as 'danger' | 'warning' | 'info'
   });
 
   useEffect(() => {
@@ -290,18 +309,24 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleDeleteOrder = async (orderId: string) => {
-    if (!confirm('Yakin ingin menghapus pesanan ini?')) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Pesanan',
+      message: 'Yakin ingin menghapus pesanan ini?',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('orders').delete().eq('id', orderId);
 
-    try {
-      const { error } = await supabase.from('orders').delete().eq('id', orderId);
+          if (error) throw error;
+          fetchOrders();
 
-      if (error) throw error;
-      fetchOrders();
-      alert('Pesanan berhasil dihapus!');
-    } catch (error) {
-      console.error('Error deleting order:', error);
-      alert('Terjadi kesalahan saat menghapus pesanan');
-    }
+        } catch (error) {
+          console.error('Error deleting order:', error);
+          alert('Terjadi kesalahan saat menghapus pesanan');
+        }
+      }
+    });
   };
 
   const handleUpdateStatus = async (orderId: string, status: string) => {
@@ -439,6 +464,27 @@ const AdminDashboard: React.FC = () => {
     XLSX.writeFile(workbook, fileName);
   };
 
+  const handleDeleteRecap = async (recapId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus Rekap',
+      message: 'Yakin ingin menghapus rekap ini?',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('recaps').delete().eq('id', recapId);
+
+          if (error) throw error;
+          fetchRecaps();
+          alert('Rekap berhasil dihapus!');
+        } catch (error) {
+          console.error('Error deleting recap:', error);
+          alert('Terjadi kesalahan saat menghapus rekap');
+        }
+      }
+    });
+  };
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -565,15 +611,24 @@ const AdminDashboard: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3 px-4">
-                          {recap.status === 'approved' && (
+                          <div className="flex items-center gap-2">
+                            {recap.status === 'approved' && (
+                              <button
+                                onClick={() => handleDownloadRecap(recap)}
+                                className="text-green-600 hover:text-green-800 font-medium text-sm flex items-center space-x-1 bg-green-50 px-2 py-1 rounded hover:bg-green-100 transition-colors"
+                              >
+                                <Download className="w-4 h-4" />
+                                <span>Download</span>
+                              </button>
+                            )}
                             <button
-                              onClick={() => handleDownloadRecap(recap)}
-                              className="text-green-600 hover:text-green-800 font-medium text-sm flex items-center space-x-1"
+                              onClick={() => handleDeleteRecap(recap.id)}
+                              className="text-red-500 hover:text-red-700 font-medium text-sm flex items-center justify-center bg-red-50 p-1.5 rounded hover:bg-red-100 transition-colors"
+                              title="Hapus Rekap"
                             >
-                              <Download className="w-4 h-4" />
-                              <span>Download</span>
+                              <Trash2 className="w-4 h-4" />
                             </button>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -677,6 +732,53 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
+              {/* Sales Chart */}
+              <div className="bg-white rounded-2xl shadow-md p-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Grafik Pendapatan (7 Hari Terakhir)</h3>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={Array.from({ length: 7 }, (_, i) => {
+                        const d = new Date();
+                        d.setDate(d.getDate() - i);
+                        return d.toISOString().split('T')[0];
+                      }).reverse().map(date => {
+                        const dayOrders = orders.filter(o =>
+                          o.created_at.startsWith(date) && o.status !== 'cancelled'
+                        );
+                        return {
+                          date: new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
+                          total: dayOrders.reduce((sum, order) => sum + order.total_amount, 0)
+                        };
+                      })}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis
+                        stroke="#9ca3af"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) => `Rp${(value / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        formatter={(value: number) => [formatPrice(value), 'Pendapatan']}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="total"
+                        stroke="#ef4444"
+                        strokeWidth={3}
+                        dot={{ r: 4, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }}
+                        activeDot={{ r: 6, fill: '#ef4444' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
               <div className="bg-white rounded-2xl shadow-md p-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-4">Pesanan Terbaru</h3>
                 <div className="space-y-3">
@@ -730,6 +832,7 @@ const AdminDashboard: React.FC = () => {
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Pelanggan</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Telepon</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Tipe</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Pembayaran</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Total</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Aksi</th>
@@ -757,6 +860,15 @@ const AdminDashboard: React.FC = () => {
                             }`}
                         >
                           {order.order_type === 'online' ? 'Online' : 'Offline'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium border ${order.payment_method === 'qris' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          order.payment_method === 'transfer' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                            'bg-green-50 text-green-700 border-green-200'
+                          }`}>
+                          {order.payment_method === 'qris' ? 'QRIS' :
+                            order.payment_method === 'transfer' ? 'Transfer' : 'Tunai'}
                         </span>
                       </td>
                       <td className="py-3 px-4 font-bold text-red-600">
@@ -1171,6 +1283,16 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+      />
     </div>
   );
 };

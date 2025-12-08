@@ -15,6 +15,7 @@ export interface Order {
   customer_name: string;
   customer_phone: string;
   order_type: 'online' | 'offline';
+  payment_method: 'cash' | 'qris' | 'transfer';
   total_amount: number;
   status: 'pending' | 'completed' | 'cancelled';
   notes?: string;

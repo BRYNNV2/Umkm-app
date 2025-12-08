@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Phone, MessageSquare, CheckCircle } from 'lucide-react';
+import { X, User, Phone, MessageSquare, CheckCircle, CreditCard, Wallet, Banknote } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { supabase } from '../../lib/supabase';
 
@@ -13,6 +13,7 @@ const Checkout: React.FC<CheckoutProps> = ({ isOpen, onClose }) => {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [notes, setNotes] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'qris' | 'transfer'>('qris');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [lastOrderTotal, setLastOrderTotal] = useState(0);
@@ -35,7 +36,9 @@ const Checkout: React.FC<CheckoutProps> = ({ isOpen, onClose }) => {
         .insert({
           customer_name: customerName,
           customer_phone: customerPhone,
+
           order_type: 'online',
+          payment_method: paymentMethod,
           total_amount: getTotalPrice(),
           status: 'pending',
           notes: notes || null,
@@ -180,22 +183,82 @@ const Checkout: React.FC<CheckoutProps> = ({ isOpen, onClose }) => {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <div className="flex items-center space-x-2">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>Catatan (Opsional)</span>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Metode Pembayaran
+            </label>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('qris')}
+                className={`flex items-center p-4 border-2 rounded-xl transition-all duration-300 ${paymentMethod === 'qris'
+                  ? 'border-red-500 bg-red-50 text-red-700'
+                  : 'border-gray-200 hover:border-red-200'
+                  }`}
+              >
+                <div className={`p-2 rounded-full mr-3 ${paymentMethod === 'qris' ? 'bg-red-200' : 'bg-gray-100'}`}>
+                  <CreditCard className="w-5 h-5" />
                 </div>
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-all duration-300 resize-none"
-                placeholder="Contoh: Jangan terlalu pedas"
-              />
+                <div className="text-left">
+                  <p className="font-bold">QRIS (Scan QR)</p>
+                  <p className="text-xs text-gray-500">Dana, OVO, GoPay, ShopeePay, Mobile Banking</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('cash')}
+                className={`flex items-center p-4 border-2 rounded-xl transition-all duration-300 ${paymentMethod === 'cash'
+                  ? 'border-red-500 bg-red-50 text-red-700'
+                  : 'border-gray-200 hover:border-red-200'
+                  }`}
+              >
+                <div className={`p-2 rounded-full mr-3 ${paymentMethod === 'cash' ? 'bg-red-200' : 'bg-gray-100'}`}>
+                  <Banknote className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <p className="font-bold">Tunai (Cash)</p>
+                  <p className="text-xs text-gray-500">Bayar di kasir saat pengambilan</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('transfer')}
+                className={`flex items-center p-4 border-2 rounded-xl transition-all duration-300 ${paymentMethod === 'transfer'
+                  ? 'border-red-500 bg-red-50 text-red-700'
+                  : 'border-gray-200 hover:border-red-200'
+                  }`}
+              >
+                <div className={`p-2 rounded-full mr-3 ${paymentMethod === 'transfer' ? 'bg-red-200' : 'bg-gray-100'}`}>
+                  <Wallet className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <p className="font-bold">Transfer Bank</p>
+                  <p className="text-xs text-gray-500">BCA 1234567890 a.n. Ayam Geprek</p>
+                </div>
+              </button>
             </div>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="flex items-center space-x-2">
+                <MessageSquare className="w-4 h-4" />
+                <span>Catatan (Opsional)</span>
+              </div>
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none transition-all duration-300 resize-none"
+              placeholder="Contoh: Jangan terlalu pedas"
+            />
+          </div>
+
 
           <button
             type="submit"
@@ -205,8 +268,8 @@ const Checkout: React.FC<CheckoutProps> = ({ isOpen, onClose }) => {
             {isSubmitting ? 'Memproses...' : 'Konfirmasi Pesanan'}
           </button>
         </form>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 
