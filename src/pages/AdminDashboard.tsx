@@ -63,6 +63,7 @@ interface Recap {
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   notes: string;
+  rejection_reason?: string;
 }
 
 const AdminDashboard: React.FC = () => {
@@ -602,13 +603,20 @@ const AdminDashboard: React.FC = () => {
                           {formatPrice(recap.total_revenue)}
                         </td>
                         <td className="py-3 px-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${recap.status === 'approved' ? 'bg-green-100 text-green-700' :
-                            recap.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                              'bg-yellow-100 text-yellow-700'
-                            }`}>
-                            {recap.status === 'approved' ? 'Disetujui' :
-                              recap.status === 'rejected' ? 'Ditolak' : 'Menunggu'}
-                          </span>
+                          <div className="flex flex-col items-start gap-1">
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${recap.status === 'approved' ? 'bg-green-100 text-green-700' :
+                              recap.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>
+                              {recap.status === 'approved' ? 'Disetujui' :
+                                recap.status === 'rejected' ? 'Ditolak' : 'Menunggu'}
+                            </span>
+                            {recap.status === 'rejected' && recap.rejection_reason && (
+                              <span className="text-xs text-red-600 italic mt-1 max-w-[200px] break-words">
+                                "{recap.rejection_reason}"
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">

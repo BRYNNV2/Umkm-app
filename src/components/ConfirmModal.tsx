@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X } from 'lucide-react';
 
 interface ConfirmModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: () => void;
+    onConfirm: (comment?: string) => void;
     title: string;
     message: string;
     confirmText?: string;
     cancelText?: string;
     variant?: 'danger' | 'warning' | 'info';
+    showInput?: boolean;
+    inputPlaceholder?: string;
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -20,8 +22,12 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
     message,
     confirmText = 'Ya',
     cancelText = 'Batal',
-    variant = 'danger'
+    variant = 'danger',
+    showInput = false,
+    inputPlaceholder = ''
 }) => {
+    const [inputValue, setInputValue] = useState('');
+
     if (!isOpen) return null;
 
     const getButtonColor = () => {
@@ -35,6 +41,12 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             default:
                 return 'bg-red-500 hover:bg-red-600 focus:ring-red-300';
         }
+    };
+
+    const handleConfirm = () => {
+        onConfirm(inputValue);
+        onClose();
+        setInputValue(''); // Reset after close
     };
 
     return (
@@ -53,7 +65,16 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 </div>
 
                 <div className="p-6">
-                    <p className="text-gray-600 text-center text-lg">{message}</p>
+                    <p className="text-gray-600 text-center text-lg mb-4">{message}</p>
+                    {showInput && (
+                        <textarea
+                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+                            rows={3}
+                            placeholder={inputPlaceholder}
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                        />
+                    )}
                 </div>
 
                 <div className="flex items-center justify-center gap-4 p-6 pt-2">
@@ -64,10 +85,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
                         {cancelText}
                     </button>
                     <button
-                        onClick={() => {
-                            onConfirm();
-                            onClose();
-                        }}
+                        onClick={handleConfirm}
                         className={`px-6 py-2.5 text-white font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 shadow-lg ${getButtonColor()}`}
                     >
                         {confirmText}

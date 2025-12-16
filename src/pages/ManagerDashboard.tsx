@@ -16,6 +16,7 @@ interface Recap {
     created_at: string;
     notes: string;
     created_by_email?: string;
+    rejection_reason?: string;
 }
 
 const ManagerDashboard: React.FC = () => {
@@ -31,8 +32,10 @@ const ManagerDashboard: React.FC = () => {
         isOpen: false,
         title: '',
         message: '',
-        onConfirm: () => { },
-        variant: 'danger' as 'danger' | 'warning' | 'info'
+        onConfirm: (_?: string) => { },
+        variant: 'danger' as 'danger' | 'warning' | 'info',
+        showInput: false,
+        inputPlaceholder: ''
     });
 
     useEffect(() => {
@@ -93,16 +96,26 @@ const ManagerDashboard: React.FC = () => {
         setConfirmModal({
             isOpen: true,
             title: newStatus === 'approved' ? 'Setujui Rekap' : 'Tolak Rekap',
-            message: `Apakah Anda yakin ingin mengubah status menjadi ${newStatus}?`,
+            message: newStatus === 'approved'
+                ? 'Apakah Anda yakin ingin menyetujui rekap ini?'
+                : 'Apakah Anda yakin ingin menolak rekap ini? Silakan berikan alasan.',
             variant: newStatus === 'approved' ? 'info' : 'warning',
-            onConfirm: async () => {
+            showInput: newStatus === 'rejected',
+            inputPlaceholder: newStatus === 'rejected' ? 'Masukkan alasan penolakan...' : '',
+            onConfirm: async (comment?: string) => {
                 try {
+                    const updateData: any = {
+                        status: newStatus,
+                        approved_by: user?.id
+                    };
+
+                    if (newStatus === 'rejected' && comment) {
+                        updateData.rejection_reason = comment;
+                    }
+
                     const { error } = await supabase
                         .from('recaps')
-                        .update({
-                            status: newStatus,
-                            approved_by: user?.id
-                        })
+                        .update(updateData)
                         .eq('id', recapId);
 
                     if (error) throw error;
@@ -129,6 +142,8 @@ const ManagerDashboard: React.FC = () => {
             title: 'Hapus Rekap',
             message: 'Yakin ingin menghapus rekap ini?',
             variant: 'danger',
+            showInput: false,
+            inputPlaceholder: '',
             onConfirm: async () => {
                 try {
                     const { error } = await supabase.from('recaps').delete().eq('id', recapId);
@@ -395,6 +410,8 @@ const ManagerDashboard: React.FC = () => {
                 title={confirmModal.title}
                 message={confirmModal.message}
                 variant={confirmModal.variant}
+                showInput={confirmModal.showInput}
+                inputPlaceholder={confirmModal.inputPlaceholder}
             />
         </div>
     );
